@@ -126,29 +126,52 @@
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
 
-        // HÀM PHÁT ÂM CHUẨN ĐÃ ĐƯỢC TỐI ƯU
+        // HÀM PHÁT ÂM CHỐNG KẸT/ĐÍCH THỰC DÙNG TRÊN ANDROID
         function speakText(text) {
-            if (!text) return;
-            
-            if ('speechSynthesis' in window) {
-                // Hủy các yêu cầu cũ trước khi phát mới
-                window.speechSynthesis.cancel();
+            if (!text || !('speechSynthesis' in window)) return;
 
-                let utterance = new SpeechSynthesisUtterance(text.trim());
-                utterance.lang = 'en-US';
-                utterance.rate = 0.85; // Tốc độ đọc tự nhiên
+            const synth = window.speechSynthesis;
 
-                window.speechSynthesis.speak(utterance);
+            // 1. Khôi phục nếu trình duyệt đang ở trạng thái pause
+            if (synth.paused) {
+                synth.resume();
             }
+
+            // 2. Dừng lượt đọc cũ
+            synth.cancel();
+
+            // 3. Khởi tạo Utterance
+            let utterance = new SpeechSynthesisUtterance(text.trim());
+            utterance.lang = 'en-US';
+            utterance.rate = 0.85; // Tốc độ đọc vừa phải
+            utterance.pitch = 1.0;
+
+            // 4. Tìm giọng đọc en-US nếu có
+            let voices = synth.getVoices();
+            if (voices.length > 0) {
+                let usVoice = voices.find(v => v.lang && v.lang.replace('_', '-').includes('en-US'));
+                if (usVoice) utterance.voice = usVoice;
+            }
+
+            // 5. Phát âm với cơ chế delay nhẹ 50ms chống xung đột sự kiện chạm
+            setTimeout(() => {
+                synth.speak(utterance);
+            }, 50);
         }
 
-        // Mồi hệ thống âm thanh ngay khi người dùng chạm vào màn hình lần đầu
-        document.body.addEventListener('touchstart', function() {
-            if ('speechSynthesis' in window && window.speechSynthesis.speaking === false) {
-                let silentUtterance = new SpeechSynthesisUtterance('');
-                window.speechSynthesis.speak(silentUtterance);
+        // Tải danh sách giọng đọc của hệ thống ngay khi sẵn sàng
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
+
+        // Kích hoạt audio context ngay khi bấm bất kỳ đâu trên màn hình
+        document.addEventListener('click', function unlockAudio() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.resume();
             }
-        }, { once: true });
+        }, { once: false });
 
         function switchRole(role) {
             if(role === 'teacher') {
@@ -238,12 +261,11 @@
                 </div>
             `;
 
-            // Đăng ký sự kiện bấm loa nghe lại
             document.getElementById('ansSpeakBtn').onclick = function() {
                 speakText(correctAns);
             };
 
-            // Tự động phát âm ngay khi nhấn Xác nhận
+            // Tự động phát âm đáp án ngay khi bấm xác nhận
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
