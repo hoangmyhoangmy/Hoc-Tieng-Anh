@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>App Học Tiếng Anh - Tối Ưu Âm Thanh V2</title>
+    <title>App Học Tiếng Anh</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -122,61 +122,53 @@
         </div>
     </div>
 
-    <!-- Thẻ Audio dùng phát âm thanh -->
-    <audio id="globalAudio" style="display:none;"></audio>
-
     <script>
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
-        let globalAudio = document.getElementById('globalAudio');
+        let voices = [];
 
-        // HÀM PHÁT ÂM V2: SỬ DỤNG HỆ THỐNG DỰ PHÒNG 3 LỚP (MULTI-FALLBACK)
+        // KÍCH HOẠT VÀ TẢI DANH SÁCH GIỌNG ĐỌC CỦA HỆ THỐNG
+        function loadVoices() {
+            if ('speechSynthesis' in window) {
+                voices = window.speechSynthesis.getVoices();
+            }
+        }
+
+        loadVoices();
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        // HÀM PHÁT ÂM NỘI BỘ HỆ THỐNG - ĐỘC LẬP HOÀN TOÀN KHÔNG CẦN MẠNG
         function speakText(text) {
             if (!text) return;
 
+            if (!('speechSynthesis' in window)) {
+                alert("Thiết bị của bạn không hỗ trợ phát âm hệ thống.");
+                return;
+            }
+
+            // Hủy các câu đọc đang chờ trước đó để tránh kẹt giọng
+            window.speechSynthesis.cancel();
+
             let cleanText = text.trim();
-            
-            // Danh sách 3 nguồn API phát âm chất lượng cao
-            let sources = [
-                // Nguồn 1: Google Translate TTS (Rất chuẩn cho câu dài)
-                `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(cleanText)}`,
-                
-                // Nguồn 2: Dictionary Voice API
-                `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(cleanText)}&type=2`,
-                
-                // Nguồn 3: ResponsiveVoice / Free TTS Backup
-                `https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=${encodeURIComponent(cleanText)}`
-            ];
+            let utterance = new SpeechSynthesisUtterance(cleanText);
 
-            let sourceIndex = 0;
+            // Thiết lập thông số đọc
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9; // Tốc độ đọc vừa phải
+            utterance.pitch = 1.0;
 
-            function playNextSource() {
-                if (sourceIndex >= sources.length) {
-                    // Nếu cả 3 nguồn API đều lỗi, fallback sang Web Speech API hệ thống
-                    if ('speechSynthesis' in window) {
-                        let utterance = new SpeechSynthesisUtterance(cleanText);
-                        utterance.lang = 'en-US';
-                        window.speechSynthesis.speak(utterance);
-                    } else {
-                        alert("Không thể phát âm thanh. Vui lòng kiểm tra kết nối mạng!");
-                    }
-                    return;
-                }
-
-                globalAudio.src = sources[sourceIndex];
-                sourceIndex++;
-
-                let promise = globalAudio.play();
-                if (promise !== undefined) {
-                    promise.catch(err => {
-                        console.log("Nguồn " + sourceIndex + " lỗi, đang thử nguồn tiếp theo...", err);
-                        playNextSource();
-                    });
+            // Nếu tìm thấy giọng Anh - Mỹ chuẩn trong danh sách máy thì ưu tiên dùng
+            if (voices.length > 0) {
+                let usVoice = voices.find(v => v.lang.includes('en-US') || v.lang.includes('en_US'));
+                if (usVoice) {
+                    utterance.voice = usVoice;
                 }
             }
 
-            // Gọi thử nguồn đầu tiên
-            playNextSource();
+            // Thực hiện phát âm
+            window.speechSynthesis.speak(utterance);
         }
 
         function switchRole(role) {
@@ -218,7 +210,7 @@
             document.getElementById('count').innerText = questions.length;
             list.innerHTML = '';
             
-            questions.forEach((q, index) => {
+            questions.forEach((q) => {
                 let li = document.createElement('li');
                 li.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:#fff; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid #e9ecef;";
                 
@@ -227,7 +219,6 @@
                     <button class="speaker-btn" style="width:36px; height:36px; font-size:16px;">🔊</button>
                 `;
                 
-                // Gán sự kiện click trực tiếp bằng JS để tránh lỗi dính dấu ngoặc/nháy
                 li.querySelector('.speaker-btn').onclick = function() {
                     speakText(q.question);
                 };
@@ -244,7 +235,6 @@
                 document.getElementById('resultBox').innerHTML = '';
                 document.getElementById('nextBtn').style.display = 'none';
                 
-                // Gán sự kiện cho nút loa câu hỏi
                 document.getElementById('studentSpeakBtn').onclick = function() {
                     speakText(qObj.question);
                 };
@@ -269,12 +259,11 @@
                 </div>
             `;
 
-            // Gán sự kiện phát âm cho nút trong ô kết quả
             document.getElementById('ansSpeakBtn').onclick = function() {
                 speakText(correctAns);
             };
 
-            // Tự động phát âm đáp án khi bấm xác nhận
+            // Tự động phát âm đáp án ngay khi bấm xác nhận
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
