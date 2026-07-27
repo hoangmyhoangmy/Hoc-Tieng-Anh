@@ -2,9 +2,8 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <!-- Tối ưu hiển thị trên màn hình Mobile iOS & Android -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>App Học Tiếng Anh Mobile</title>
+    <title>App Học Tiếng Anh - Galaxy Note 10+</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -24,7 +23,7 @@
             margin-bottom: 20px; 
         }
         .btn { 
-            background: #007aff; /* Apple Blue */
+            background: #007aff; 
             color: white; 
             border: none; 
             padding: 12px 18px; 
@@ -33,7 +32,6 @@
             font-weight: 600;
             cursor: pointer; 
             width: 100%;
-            transition: opacity 0.2s;
         }
         .btn:active { opacity: 0.8; }
         .role-container { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -49,24 +47,22 @@
             font-size: 16px;
             outline: none;
         }
-        input:focus { border-color: #007aff; }
 
-        /* Style Nút Loa chuẩn Mobile */
         .speaker-btn {
-            background: #f0f4f9;
-            border: 1px solid #d0d7de;
+            background: #e7f5ff;
+            border: 1.5px solid #74c0fc;
             border-radius: 50%;
-            width: 44px; /* Kích thước chuẩn dễ bấm bằng ngón tay */
-            height: 44px;
+            width: 46px;
+            height: 46px;
             cursor: pointer;
-            font-size: 20px;
+            font-size: 22px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
             margin-left: 10px;
         }
-        .speaker-btn:active { background: #d0e2ff; transform: scale(0.95); }
+        .speaker-btn:active { background: #a5d8ff; transform: scale(0.92); }
 
         .question-title { 
             display: flex; 
@@ -81,7 +77,7 @@
         .result { font-weight: bold; margin-top: 15px; font-size: 16px; }
         .correct { color: #2b8a3e; background: #ebfbee; padding: 12px; border-radius: 10px; }
         .wrong { color: #c92a2a; background: #fff5f5; padding: 12px; border-radius: 10px; }
-        ul { padding-left: 20px; }
+        ul { padding-left: 15px; }
         li { margin-bottom: 10px; }
     </style>
 </head>
@@ -89,7 +85,6 @@
 
     <h2>App Học Tiếng Anh</h2>
     
-    <!-- Chọn vai trò -->
     <div class="role-container">
         <button class="btn btn-role btn-active" id="btnTeacher" onclick="switchRole('teacher')">1. Người Tạo Bài</button>
         <button class="btn btn-role" id="btnStudent" onclick="switchRole('student')">2. Người Làm Bài</button>
@@ -116,7 +111,7 @@
         <div id="quizArea">
             <div class="question-title">
                 <span id="currentQuestion"></span>
-                <button class="speaker-btn" title="Nghe phát âm" onclick="speakCurrentQuestion()">🔊</button>
+                <button class="speaker-btn" title="Nghe phát âm" onclick="speakText(questions[currentIndex].question)">🔊</button>
             </div>
             
             <input type="text" id="userAnswer" placeholder="Nhập đáp án của bạn..." style="margin-top: 15px;">
@@ -127,54 +122,46 @@
         </div>
     </div>
 
-    <!-- Audio Element ngầm hỗ trợ iOS/Android -->
-    <audio id="audioPlayer" style="display:none;"></audio>
-
     <script>
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
+        let synth = window.speechSynthesis;
 
-        // --- PHÁT ÂM TỐI ƯU CHO IOS VÀ ANDROID ---
+        // KÍCH HOẠT ENGINE ÂM THANH NGAY KHI NGƯỜI DÙNG CHẠM MÀN HÌNH (Đặc trị cho Android/Samsung)
+        document.body.addEventListener('click', function() {
+            if (synth && synth.speaking === false) {
+                // Đòn bẩy giúp unlock audio context trên Android
+                let dummy = new SpeechSynthesisUtterance('');
+                synth.speak(dummy);
+            }
+        }, { once: true });
+
+        // HÀM PHÁT ÂM TỐI ƯU CHO ANDROID / SAMSUNG GALAXY
         function speakText(text) {
             if (!text) return;
 
-            // Dùng Web Speech API chuẩn của iOS Safari / Android Chrome
-            if ('speechSynthesis' in window && window.speechSynthesis) {
-                try {
-                    window.speechSynthesis.cancel();
-                    
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'en-US';
-                    utterance.rate = 0.9; // Tốc độ vừa phải
+            if ('speechSynthesis' in window) {
+                // Hủy các lệnh đọc cũ
+                synth.cancel();
 
-                    utterance.onerror = function() {
-                        playGoogleTTS(text);
-                    };
+                setTimeout(() => {
+                    let utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'en-US'; 
+                    utterance.rate = 0.85; // Tốc độ chuẩn dễ nghe
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1.0;
 
-                    window.speechSynthesis.speak(utterance);
-                    return;
-                } catch (e) {
-                    playGoogleTTS(text);
-                    return;
-                }
-            }
+                    // Lấy danh sách giọng đọc của Google trên Samsung Android
+                    let voices = synth.getVoices();
+                    let enVoice = voices.find(v => v.lang.includes('en') || v.lang.includes('en_US'));
+                    if (enVoice) {
+                        utterance.voice = enVoice;
+                    }
 
-            // Dự phòng bằng Google TTS nếu trình duyệt chặn
-            playGoogleTTS(text);
-        }
-
-        function playGoogleTTS(text) {
-            const audio = document.getElementById('audioPlayer');
-            const encodedText = encodeURIComponent(text);
-            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodedText}`;
-            audio.play().catch(err => {
-                console.log("iOS yêu cầu chạm vào màn hình để phát audio:", err);
-            });
-        }
-
-        function speakCurrentQuestion() {
-            if(questions[currentIndex]) {
-                speakText(questions[currentIndex].question);
+                    synth.speak(utterance);
+                }, 50);
+            } else {
+                alert("Rất tiếc, thiết bị của bạn không hỗ trợ tính năng chuyển văn bản thành giọng nói.");
             }
         }
 
@@ -219,7 +206,7 @@
                 const safeQ = q.question.replace(/'/g, "\\'");
                 return `<li style="display:flex; align-items:center; justify-content:space-between;">
                     <span><b>${q.question}</b> - Đáp án: <i>${q.answer}</i></span>
-                    <button class="speaker-btn" style="width:34px; height:34px; font-size:14px;" onclick="speakText('${safeQ}')">🔊</button>
+                    <button class="speaker-btn" style="width:36px; height:36px; font-size:16px;" onclick="speakText('${safeQ}')">🔊</button>
                 </li>`;
             }).join('');
         }
@@ -252,7 +239,7 @@
                 </div>
             `;
 
-            // Tự động phát âm đáp án khi người dùng bấm xác nhận
+            // Đọc đáp án ngay sau tương tác bấm nút
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
