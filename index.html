@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Học Tiếng Anh</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; background: #f4f7f6; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .btn { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
+        .btn-role { background: #6c757d; margin-right: 10px; }
+        .btn-active { background: #28a745; }
+        input, select { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
+        .result { font-weight: bold; margin-top: 10px; }
+        .correct { color: green; }
+        .wrong { color: red; }
+    </style>
+</head>
+<body>
+
+    <h2>Ứng Dụng Học Tiếng Anh</h2>
+    
+    <!-- Chọn vai trò -->
+    <div style="margin-bottom: 20px;">
+        <button class="btn btn-role btn-active" id="btnTeacher" onclick="switchRole('teacher')">1. Người Tạo Bài Học</button>
+        <button class="btn btn-role" id="btnStudent" onclick="switchRole('student')">2. Người Làm Bài</button>
+    </div>
+
+    <!-- GIAO DIỆN NGƯỜI TẠO BÀI HỌC -->
+    <div id="teacherView" class="card">
+        <h3>Tạo Bài Học Mới</h3>
+        <label>Từ / Câu hỏi:</label>
+        <input type="text" id="questionInput" placeholder="Ví dụ: Đọc sách tiếng Anh là gì?">
+        
+        <label>Đáp án đúng:</label>
+        <input type="text" id="answerInput" placeholder="Ví dụ: Read">
+        
+        <button class="btn" onclick="addQuestion()">Lưu Câu Hỏi</button>
+
+        <h4 style="margin-top: 20px;">Danh sách câu hỏi đã tạo (<span id="count">0</span>):</h4>
+        <ul id="questionList"></ul>
+    </div>
+
+    <!-- GIAO DIỆN NGƯỜI LÀM BÀI -->
+    <div id="studentView" class="card" style="display: none;">
+        <h3>Làm Bài Tập</h3>
+        <div id="quizArea">
+            <p id="currentQuestion" style="font-size: 18px; font-weight: bold;"></p>
+            <input type="text" id="userAnswer" placeholder="Nhập đáp án của bạn...">
+            <button class="btn" onclick="checkAnswer()">Xác nhận & Xem đáp án</button>
+            
+            <div id="resultBox" class="result"></div>
+            <button class="btn" id="nextBtn" style="display:none; margin-top: 10px; background: #17a2b8;" onclick="nextQuestion()">Câu tiếp theo ➔</button>
+        </div>
+    </div>
+
+    <script>
+        // Lưu trữ danh sách câu hỏi
+        let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
+        let currentIndex = 0;
+
+        function switchRole(role) {
+            if(role === 'teacher') {
+                document.getElementById('teacherView').style.display = 'block';
+                document.getElementById('studentView').style.display = 'none';
+                document.getElementById('btnTeacher').classList.add('btn-active');
+                document.getElementById('btnStudent').classList.remove('btn-active');
+                renderTeacherList();
+            } else {
+                if(questions.length === 0) {
+                    alert('Chưa có câu hỏi nào! Vui lòng tạo câu hỏi trước.');
+                    return;
+                }
+                document.getElementById('teacherView').style.display = 'none';
+                document.getElementById('studentView').style.display = 'block';
+                document.getElementById('btnStudent').classList.add('btn-active');
+                document.getElementById('btnTeacher').classList.remove('btn-active');
+                currentIndex = 0;
+                loadQuestion();
+            }
+        }
+
+        function addQuestion() {
+            const q = document.getElementById('questionInput').value.trim();
+            const a = document.getElementById('answerInput').value.trim();
+            if(!q || !a) return alert('Vui lòng nhập đầy đủ câu hỏi và đáp án!');
+
+            questions.push({ question: q, answer: a });
+            localStorage.setItem('english_quiz', JSON.stringify(questions));
+            document.getElementById('questionInput').value = '';
+            document.getElementById('answerInput').value = '';
+            renderTeacherList();
+            alert('Đã thêm câu hỏi thành công!');
+        }
+
+        function renderTeacherList() {
+            const list = document.getElementById('questionList');
+            document.getElementById('count').innerText = questions.length;
+            list.innerHTML = questions.map(q => `<li><b>${q.question}</b> - Đáp án: <i>${q.answer}</i></li>`).join('');
+        }
+
+        function loadQuestion() {
+            if(currentIndex < questions.length) {
+                document.getElementById('currentQuestion').innerText = `Câu ${currentIndex + 1}: ${questions[currentIndex].question}`;
+                document.getElementById('userAnswer').value = '';
+                document.getElementById('resultBox').innerHTML = '';
+                document.getElementById('nextBtn').style.display = 'none';
+            } else {
+                document.getElementById('quizArea').innerHTML = '<h4>🎉 Bạn đã hoàn thành tất cả câu hỏi!</h4>';
+            }
+        }
+
+        function checkAnswer() {
+            const userAns = document.getElementById('userAnswer').value.trim();
+            const correctAns = questions[currentIndex].answer;
+            const resultBox = document.getElementById('resultBox');
+
+            if(!userAns) return alert('Vui lòng nhập câu trả lời!');
+
+            if(userAns.toLowerCase() === correctAns.toLowerCase()) {
+                resultBox.innerHTML = `<span class="correct"> Chính xác! Đáp án đúng là: ${correctAns}</span>`;
+            } else {
+                resultBox.innerHTML = `<span class="wrong"> Sai rồi! Đáp án đúng là: ${correctAns}</span>`;
+            }
+            document.getElementById('nextBtn').style.display = 'inline-block';
+        }
+
+        function nextQuestion() {
+            currentIndex++;
+            loadQuestion();
+        }
+
+        renderTeacherList();
+    </script>
+</body>
+</html>
