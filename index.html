@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>App Học Tiếng Anh - Galaxy Note 10+</title>
+    <title>App Học Tiếng Anh - Tối Ưu Âm Thanh</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -122,46 +122,35 @@
         </div>
     </div>
 
+    <!-- Thẻ Audio ẩn dùng phát âm thanh trực tiếp -->
+    <audio id="globalAudio" style="display:none;"></audio>
+
     <script>
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
-        let synth = window.speechSynthesis;
+        let globalAudio = document.getElementById('globalAudio');
 
-        // KÍCH HOẠT ENGINE ÂM THANH NGAY KHI NGƯỜI DÙNG CHẠM MÀN HÌNH (Đặc trị cho Android/Samsung)
-        document.body.addEventListener('click', function() {
-            if (synth && synth.speaking === false) {
-                // Đòn bẩy giúp unlock audio context trên Android
-                let dummy = new SpeechSynthesisUtterance('');
-                synth.speak(dummy);
-            }
-        }, { once: true });
-
-        // HÀM PHÁT ÂM TỐI ƯU CHO ANDROID / SAMSUNG GALAXY
+        // HÀM PHÁT ÂM HOÀN TOÀN MỚI: Dùng HTML5 Audio trực tiếp
         function speakText(text) {
             if (!text) return;
 
-            if ('speechSynthesis' in window) {
-                // Hủy các lệnh đọc cũ
-                synth.cancel();
+            // Làm sạch chuỗi ký tự để đưa vào đường dẫn URL
+            let cleanText = encodeURIComponent(text.trim());
+            
+            // Đường dẫn tạo MP3 đọc tiếng Anh chuẩn (en) từ máy chủ âm thanh
+            let audioUrl = `https://dict.youdao.com/dictvoice?audio=${cleanText}&type=2`; // type=2 là giọng Anh-Mỹ chuẩn
 
-                setTimeout(() => {
-                    let utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'en-US'; 
-                    utterance.rate = 0.85; // Tốc độ chuẩn dễ nghe
-                    utterance.pitch = 1.0;
-                    utterance.volume = 1.0;
-
-                    // Lấy danh sách giọng đọc của Google trên Samsung Android
-                    let voices = synth.getVoices();
-                    let enVoice = voices.find(v => v.lang.includes('en') || v.lang.includes('en_US'));
-                    if (enVoice) {
-                        utterance.voice = enVoice;
-                    }
-
-                    synth.speak(utterance);
-                }, 50);
-            } else {
-                alert("Rất tiếc, thiết bị của bạn không hỗ trợ tính năng chuyển văn bản thành giọng nói.");
+            globalAudio.src = audioUrl;
+            
+            // Thực hiện phát âm thanh
+            let playPromise = globalAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("Cần tương tác chạm màn hình để mở âm thanh:", error);
+                    // Dự phòng đường dẫn thứ 2 nếu đường dẫn 1 bị ngắt kết nối
+                    globalAudio.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${cleanText}`;
+                    globalAudio.play();
+                });
             }
         }
 
@@ -239,7 +228,7 @@
                 </div>
             `;
 
-            // Đọc đáp án ngay sau tương tác bấm nút
+            // Tự động phát âm đáp án ngay sau khi bấm xác nhận
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
