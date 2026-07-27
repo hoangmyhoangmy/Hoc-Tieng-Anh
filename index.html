@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>App Học Tiếng Anh</title>
+    <!-- THƯ VIỆN PHÁT ÂM CHUYÊN DỤNG CHO MOBILE -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE_KEY"></script>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -122,54 +124,24 @@
         </div>
     </div>
 
-    <!-- AUDIO PLAYER DỰ PHÒNG -->
-    <audio id="audioFallback" style="display:none;"></audio>
-
     <script>
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
 
+        // HÀM PHÁT ÂM QUA RESPONSIVE VOICE DÀNH CHO MOBILE
         function speakText(text) {
             if (!text) return;
             const cleanText = text.trim();
 
-            // PHƯƠNG ÁN 1: DÙNG SPEECH SYNTHESIS CỦA HỆ THỐNG
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-
+            if (typeof responsiveVoice !== 'undefined') {
+                responsiveVoice.cancel(); // Dừng câu cũ nếu đang đọc
+                responsiveVoice.speak(cleanText, "US English Female", { rate: 0.85 });
+            } else if ('speechSynthesis' in window) {
+                // Dự phòng trường hợp thư viện chưa kịp tải
                 let utterance = new SpeechSynthesisUtterance(cleanText);
                 utterance.lang = 'en-US';
-                utterance.rate = 0.85;
-
-                // Cờ kiểm tra xem hệ thống có thực sự đọc hay không
-                let hasSpoken = false;
-
-                utterance.onstart = function() {
-                    hasSpoken = true;
-                };
-
                 window.speechSynthesis.speak(utterance);
-
-                // Sau 300ms nếu hệ thống không bắt đầu đọc (bị im re do thiếu gói ngôn ngữ Android)
-                setTimeout(() => {
-                    if (!hasSpoken && !window.speechSynthesis.speaking) {
-                        speakFallback(cleanText);
-                    }
-                }, 300);
-            } else {
-                speakFallback(cleanText);
             }
-        }
-
-        // PHƯƠNG ÁN 2: PHÁT DỰ PHÒNG QUA NGUỒN AUDIO ĐÁNG TIN CẬY
-        function speakFallback(text) {
-            const audio = document.getElementById('audioFallback');
-            const encodedText = encodeURIComponent(text);
-            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=en&client=tw-ob`;
-            
-            audio.play().catch(e => {
-                console.log("Audio play error:", e);
-            });
         }
 
         function switchRole(role) {
@@ -264,6 +236,7 @@
                 speakText(correctAns);
             };
 
+            // Tự động phát âm đáp án ngay khi nhấn xác nhận
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
