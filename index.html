@@ -126,43 +126,29 @@
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
 
-        // KÍCH HOẠT HỆ THỐNG PHÁT ÂM CỦA MÁY
-        let synth = window.speechSynthesis;
-
+        // HÀM PHÁT ÂM CHUẨN ĐÃ ĐƯỢC TỐI ƯU
         function speakText(text) {
-            if (!text || !synth) return;
+            if (!text) return;
+            
+            if ('speechSynthesis' in window) {
+                // Hủy các yêu cầu cũ trước khi phát mới
+                window.speechSynthesis.cancel();
 
-            // 1. Dừng mọi luồng âm thanh đang phát trước đó để tránh tắc nghẽn bộ nhớ
-            synth.cancel();
+                let utterance = new SpeechSynthesisUtterance(text.trim());
+                utterance.lang = 'en-US';
+                utterance.rate = 0.85; // Tốc độ đọc tự nhiên
 
-            // 2. Tạo đối tượng đọc mới
-            let cleanText = text.trim();
-            let utterance = new SpeechSynthesisUtterance(cleanText);
-
-            // 3. Cấu hình ngôn ngữ bắt buộc: Tiếng Anh (Mỹ)
-            utterance.lang = 'en-US';
-            utterance.rate = 0.85; // Tốc độ vừa phải cho câu dài
-            utterance.pitch = 1.0;
-
-            // 4. Tìm và chọn giọng chuẩn en-US có sẵn trong máy Samsung
-            let voices = synth.getVoices();
-            if (voices.length > 0) {
-                let usVoice = voices.find(v => v.lang.replaceAll('_', '-').includes('en-US'));
-                if (usVoice) {
-                    utterance.voice = usVoice;
-                }
+                window.speechSynthesis.speak(utterance);
             }
-
-            // 5. Thực hiện phát âm
-            setTimeout(() => {
-                synth.speak(utterance);
-            }, 50);
         }
 
-        // Tải danh sách giọng đọc sẵn có của hệ thống
-        if (synth && synth.onvoiceschanged !== undefined) {
-            synth.onvoiceschanged = () => synth.getVoices();
-        }
+        // Mồi hệ thống âm thanh ngay khi người dùng chạm vào màn hình lần đầu
+        document.body.addEventListener('touchstart', function() {
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking === false) {
+                let silentUtterance = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(silentUtterance);
+            }
+        }, { once: true });
 
         function switchRole(role) {
             if(role === 'teacher') {
@@ -252,11 +238,12 @@
                 </div>
             `;
 
+            // Đăng ký sự kiện bấm loa nghe lại
             document.getElementById('ansSpeakBtn').onclick = function() {
                 speakText(correctAns);
             };
 
-            // Tự động phát âm đáp án ngay khi bấm xác nhận
+            // Tự động phát âm ngay khi nhấn Xác nhận
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
