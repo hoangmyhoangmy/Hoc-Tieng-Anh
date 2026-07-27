@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App Học Tiếng Anh</title>
+    <title>App Học Tiếng Anh - Có Phát Âm</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; background: #f4f7f6; }
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
@@ -11,9 +11,25 @@
         .btn-role { background: #6c757d; margin-right: 10px; }
         .btn-active { background: #28a745; }
         input, select { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
-        .result { font-weight: bold; margin-top: 10px; }
+        .result { font-weight: bold; margin-top: 15px; font-size: 16px; }
         .correct { color: green; }
         .wrong { color: red; }
+        
+        /* Style riêng cho nút phát âm */
+        .speaker-btn {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 8px;
+            vertical-align: middle;
+            transition: 0.2s;
+        }
+        .speaker-btn:hover { background: #e0e0e0; transform: scale(1.1); }
+        .question-title { display: flex; align-items: center; font-size: 18px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -29,8 +45,8 @@
     <!-- GIAO DIỆN NGƯỜI TẠO BÀI HỌC -->
     <div id="teacherView" class="card">
         <h3>Tạo Bài Học Mới</h3>
-        <label>Từ / Câu hỏi:</label>
-        <input type="text" id="questionInput" placeholder="Ví dụ: Đọc sách tiếng Anh là gì?">
+        <label>Từ / Câu hỏi tiếng Anh:</label>
+        <input type="text" id="questionInput" placeholder="Ví dụ: Read">
         
         <label>Đáp án đúng:</label>
         <input type="text" id="answerInput" placeholder="Ví dụ: Read">
@@ -45,19 +61,45 @@
     <div id="studentView" class="card" style="display: none;">
         <h3>Làm Bài Tập</h3>
         <div id="quizArea">
-            <p id="currentQuestion" style="font-size: 18px; font-weight: bold;"></p>
-            <input type="text" id="userAnswer" placeholder="Nhập đáp án của bạn...">
+            <div class="question-title">
+                <span id="currentQuestion"></span>
+                <!-- Nút loa phát âm tiếng Anh cho câu hỏi -->
+                <button class="speaker-btn" title="Nghe phát âm" onclick="speakCurrentQuestion()">🔊</button>
+            </div>
+            
+            <input type="text" id="userAnswer" placeholder="Nhập đáp án của bạn..." style="margin-top: 15px;">
             <button class="btn" onclick="checkAnswer()">Xác nhận & Xem đáp án</button>
             
             <div id="resultBox" class="result"></div>
-            <button class="btn" id="nextBtn" style="display:none; margin-top: 10px; background: #17a2b8;" onclick="nextQuestion()">Câu tiếp theo ➔</button>
+            <button class="btn" id="nextBtn" style="display:none; margin-top: 15px; background: #17a2b8;" onclick="nextQuestion()">Câu tiếp theo ➔</button>
         </div>
     </div>
 
     <script>
-        // Lưu trữ danh sách câu hỏi
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
+
+        // --- HÀM PHÁT ÂM TIẾNG ANH (TEXT TO SPEECH) ---
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                // Hủy các câu đang đọc dở (nếu có)
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US'; // Giọng Anh - Mỹ chuẩn (Có thể đổi thành 'en-GB' cho giọng Anh - Anh)
+                utterance.rate = 0.9;     // Tốc độ đọc (1.0 là bình thường, 0.9 chậm hơn 1 chút cho dễ nghe)
+                
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert('Trình duyệt của bạn không hỗ trợ tính năng phát âm!');
+            }
+        }
+
+        function speakCurrentQuestion() {
+            if(questions[currentIndex]) {
+                speakText(questions[currentIndex].question);
+            }
+        }
 
         function switchRole(role) {
             if(role === 'teacher') {
@@ -96,7 +138,12 @@
         function renderTeacherList() {
             const list = document.getElementById('questionList');
             document.getElementById('count').innerText = questions.length;
-            list.innerHTML = questions.map(q => `<li><b>${q.question}</b> - Đáp án: <i>${q.answer}</i></li>`).join('');
+            list.innerHTML = questions.map((q, index) => 
+                `<li>
+                    <b>${q.question}</b> - Đáp án: <i>${q.answer}</i> 
+                    <button class="speaker-btn" style="width:28px; height:28px; font-size:12px;" onclick="speakText('${q.question.replace(/'/g, "\\'")}')">🔊</button>
+                </li>`
+            ).join('');
         }
 
         function loadQuestion() {
@@ -117,11 +164,19 @@
 
             if(!userAns) return alert('Vui lòng nhập câu trả lời!');
 
-            if(userAns.toLowerCase() === correctAns.toLowerCase()) {
-                resultBox.innerHTML = `<span class="correct"> Chính xác! Đáp án đúng là: ${correctAns}</span>`;
-            } else {
-                resultBox.innerHTML = `<span class="wrong"> Sai rồi! Đáp án đúng là: ${correctAns}</span>`;
-            }
+            const isCorrect = userAns.toLowerCase() === correctAns.toLowerCase();
+            
+            // Hiện đáp án kèm nút loa để nghe đáp án chuẩn
+            resultBox.innerHTML = `
+                <div class="${isCorrect ? 'correct' : 'wrong'}">
+                    ${isCorrect ? '✅ Chính xác!' : '❌ Chưa đúng!'} Đáp án đúng là: <b>${correctAns}</b>
+                    <button class="speaker-btn" title="Nghe đáp án" onclick="speakText('${correctAns.replace(/'/g, "\\'")}')">🔊</button>
+                </div>
+            `;
+
+            // Tự động phát âm đáp án đúng khi nhấn xác nhận
+            speakText(correctAns);
+
             document.getElementById('nextBtn').style.display = 'inline-block';
         }
 
