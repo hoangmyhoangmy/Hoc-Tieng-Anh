@@ -81,9 +81,29 @@
         .wrong { color: #c92a2a; background: #fff5f5; padding: 12px; border-radius: 10px; }
         ul { padding-left: 0; list-style-type: none; }
         li { margin-bottom: 10px; }
+
+        /* KHUNG THÔNG BÁO CHO ZALO */
+        .zalo-warning {
+            display: none;
+            background: #fff3cd;
+            color: #856404;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ffeeba;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.5;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
     </style>
 </head>
 <body>
+
+    <!-- THÔNG BÁO TỰ ĐỘNG HIỂN THỊ NẾU MỞ BẰNG ZALO -->
+    <div id="zaloWarning" class="zalo-warning">
+        ⚠️ <b>Lưu ý phát âm:</b> Trình duyệt Zalo đang chặn âm thanh.<br>
+        Vui lòng bấm <b>dấu 3 chấm (...)</b> ở góc trên bên phải ➔ Chọn <b>"Mở bằng trình duyệt"</b> (hoặc Chrome/Safari) để nghe được âm thanh.
+    </div>
 
     <h2>App Học Tiếng Anh</h2>
     
@@ -125,6 +145,12 @@
     </div>
 
     <script>
+        // TỰ ĐỘNG PHÁT HIỆN NGƯỜI DÙNG ĐANG MỞ BẰNG ZALO
+        const isZalo = /zalo/i.test(navigator.userAgent);
+        if (isZalo) {
+            document.getElementById('zaloWarning').style.display = 'block';
+        }
+
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
 
