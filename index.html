@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>App Học Tiếng Anh - Tối Ưu Âm Thanh</title>
+    <title>App Học Tiếng Anh - Tối Ưu Âm Thanh V2</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -111,7 +111,7 @@
         <div id="quizArea">
             <div class="question-title">
                 <span id="currentQuestion"></span>
-                <button class="speaker-btn" title="Nghe phát âm" onclick="speakText(questions[currentIndex].question)">🔊</button>
+                <button class="speaker-btn" title="Nghe phát âm" id="studentSpeakBtn">🔊</button>
             </div>
             
             <input type="text" id="userAnswer" placeholder="Nhập đáp án của bạn..." style="margin-top: 15px;">
@@ -122,7 +122,7 @@
         </div>
     </div>
 
-    <!-- Thẻ Audio ẩn dùng phát âm thanh trực tiếp -->
+    <!-- Thẻ Audio dùng phát âm thanh -->
     <audio id="globalAudio" style="display:none;"></audio>
 
     <script>
@@ -130,35 +130,53 @@
         let currentIndex = 0;
         let globalAudio = document.getElementById('globalAudio');
 
-        // HÀM PHÁT ÂM CHUẨN: Hỗ trợ cả từ đơn lẫn câu dài chứa khoảng trắng
+        // HÀM PHÁT ÂM V2: SỬ DỤNG HỆ THỐNG DỰ PHÒNG 3 LỚP (MULTI-FALLBACK)
         function speakText(text) {
             if (!text) return;
 
-            // Mã hóa chuỗi câu an toàn (bao gồm cả khoảng trắng và ký tự đặc biệt)
-            let params = new URLSearchParams({
-                audio: text.trim(),
-                type: '2' // Giọng Anh - Mỹ chuẩn
-            });
+            let cleanText = text.trim();
             
-            let audioUrl = `https://dict.youdao.com/dictvoice?${params.toString()}`;
+            // Danh sách 3 nguồn API phát âm chất lượng cao
+            let sources = [
+                // Nguồn 1: Google Translate TTS (Rất chuẩn cho câu dài)
+                `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(cleanText)}`,
+                
+                // Nguồn 2: Dictionary Voice API
+                `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(cleanText)}&type=2`,
+                
+                // Nguồn 3: ResponsiveVoice / Free TTS Backup
+                `https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=${encodeURIComponent(cleanText)}`
+            ];
 
-            globalAudio.src = audioUrl;
-            
-            let playPromise = globalAudio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    console.log("Dự phòng đường dẫn thứ 2:", error);
-                    // Đường dẫn dự phòng 2 nếu đường dẫn chính gặp vấn đề kết nối
-                    let googleParams = new URLSearchParams({
-                        ie: 'UTF-8',
-                        tl: 'en',
-                        client: 'tw-ob',
-                        q: text.trim()
+            let sourceIndex = 0;
+
+            function playNextSource() {
+                if (sourceIndex >= sources.length) {
+                    // Nếu cả 3 nguồn API đều lỗi, fallback sang Web Speech API hệ thống
+                    if ('speechSynthesis' in window) {
+                        let utterance = new SpeechSynthesisUtterance(cleanText);
+                        utterance.lang = 'en-US';
+                        window.speechSynthesis.speak(utterance);
+                    } else {
+                        alert("Không thể phát âm thanh. Vui lòng kiểm tra kết nối mạng!");
+                    }
+                    return;
+                }
+
+                globalAudio.src = sources[sourceIndex];
+                sourceIndex++;
+
+                let promise = globalAudio.play();
+                if (promise !== undefined) {
+                    promise.catch(err => {
+                        console.log("Nguồn " + sourceIndex + " lỗi, đang thử nguồn tiếp theo...", err);
+                        playNextSource();
                     });
-                    globalAudio.src = `https://translate.google.com/translate_tts?${googleParams.toString()}`;
-                    globalAudio.play();
-                });
+                }
             }
+
+            // Gọi thử nguồn đầu tiên
+            playNextSource();
         }
 
         function switchRole(role) {
@@ -198,21 +216,38 @@
         function renderTeacherList() {
             const list = document.getElementById('questionList');
             document.getElementById('count').innerText = questions.length;
-            list.innerHTML = questions.map((q) => {
-                const safeQ = q.question.replace(/'/g, "\\'");
-                return `<li style="display:flex; align-items:center; justify-content:space-between; background:#fff; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid #e9ecef;">
+            list.innerHTML = '';
+            
+            questions.forEach((q, index) => {
+                let li = document.createElement('li');
+                li.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:#fff; padding:10px; border-radius:8px; margin-bottom:8px; border:1px solid #e9ecef;";
+                
+                li.innerHTML = `
                     <span><b>${q.question}</b><br><small style="color:#6c757d;">Đáp án: ${q.answer}</small></span>
-                    <button class="speaker-btn" style="width:36px; height:36px; font-size:16px;" onclick="speakText('${safeQ}')">🔊</button>
-                </li>`;
-            }).join('');
+                    <button class="speaker-btn" style="width:36px; height:36px; font-size:16px;">🔊</button>
+                `;
+                
+                // Gán sự kiện click trực tiếp bằng JS để tránh lỗi dính dấu ngoặc/nháy
+                li.querySelector('.speaker-btn').onclick = function() {
+                    speakText(q.question);
+                };
+                
+                list.appendChild(li);
+            });
         }
 
         function loadQuestion() {
             if(currentIndex < questions.length) {
-                document.getElementById('currentQuestion').innerText = `Câu ${currentIndex + 1}: ${questions[currentIndex].question}`;
+                let qObj = questions[currentIndex];
+                document.getElementById('currentQuestion').innerText = `Câu ${currentIndex + 1}: ${qObj.question}`;
                 document.getElementById('userAnswer').value = '';
                 document.getElementById('resultBox').innerHTML = '';
                 document.getElementById('nextBtn').style.display = 'none';
+                
+                // Gán sự kiện cho nút loa câu hỏi
+                document.getElementById('studentSpeakBtn').onclick = function() {
+                    speakText(qObj.question);
+                };
             } else {
                 document.getElementById('quizArea').innerHTML = '<h4 style="text-align:center; font-size:18px;">🎉 Bạn đã hoàn thành tất cả câu hỏi!</h4>';
             }
@@ -226,16 +261,20 @@
             if(!userAns) return alert('Vui lòng nhập câu trả lời!');
 
             const isCorrect = userAns.toLowerCase() === correctAns.toLowerCase();
-            const safeAns = correctAns.replace(/'/g, "\\'");
             
             resultBox.innerHTML = `
                 <div class="${isCorrect ? 'correct' : 'wrong'}" style="display:flex; align-items:center; justify-content:space-between;">
                     <span>${isCorrect ? '✅ Chính xác!' : '❌ Chưa đúng!'} Đáp án: <b>${correctAns}</b></span>
-                    <button class="speaker-btn" title="Nghe đáp án" onclick="speakText('${safeAns}')">🔊</button>
+                    <button class="speaker-btn" id="ansSpeakBtn" title="Nghe đáp án">🔊</button>
                 </div>
             `;
 
-            // Tự động phát âm đáp án ngay khi bấm kiểm tra
+            // Gán sự kiện phát âm cho nút trong ô kết quả
+            document.getElementById('ansSpeakBtn').onclick = function() {
+                speakText(correctAns);
+            };
+
+            // Tự động phát âm đáp án khi bấm xác nhận
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
