@@ -125,50 +125,43 @@
     <script>
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
-        let voices = [];
 
-        // KÍCH HOẠT VÀ TẢI DANH SÁCH GIỌNG ĐỌC CỦA HỆ THỐNG
-        function loadVoices() {
-            if ('speechSynthesis' in window) {
-                voices = window.speechSynthesis.getVoices();
-            }
-        }
+        // KÍCH HOẠT HỆ THỐNG PHÁT ÂM CỦA MÁY
+        let synth = window.speechSynthesis;
 
-        loadVoices();
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
-
-        // HÀM PHÁT ÂM NỘI BỘ HỆ THỐNG - ĐỘC LẬP HOÀN TOÀN KHÔNG CẦN MẠNG
         function speakText(text) {
-            if (!text) return;
+            if (!text || !synth) return;
 
-            if (!('speechSynthesis' in window)) {
-                alert("Thiết bị của bạn không hỗ trợ phát âm hệ thống.");
-                return;
-            }
+            // 1. Dừng mọi luồng âm thanh đang phát trước đó để tránh tắc nghẽn bộ nhớ
+            synth.cancel();
 
-            // Hủy các câu đọc đang chờ trước đó để tránh kẹt giọng
-            window.speechSynthesis.cancel();
-
+            // 2. Tạo đối tượng đọc mới
             let cleanText = text.trim();
             let utterance = new SpeechSynthesisUtterance(cleanText);
 
-            // Thiết lập thông số đọc
+            // 3. Cấu hình ngôn ngữ bắt buộc: Tiếng Anh (Mỹ)
             utterance.lang = 'en-US';
-            utterance.rate = 0.9; // Tốc độ đọc vừa phải
+            utterance.rate = 0.85; // Tốc độ vừa phải cho câu dài
             utterance.pitch = 1.0;
 
-            // Nếu tìm thấy giọng Anh - Mỹ chuẩn trong danh sách máy thì ưu tiên dùng
+            // 4. Tìm và chọn giọng chuẩn en-US có sẵn trong máy Samsung
+            let voices = synth.getVoices();
             if (voices.length > 0) {
-                let usVoice = voices.find(v => v.lang.includes('en-US') || v.lang.includes('en_US'));
+                let usVoice = voices.find(v => v.lang.replaceAll('_', '-').includes('en-US'));
                 if (usVoice) {
                     utterance.voice = usVoice;
                 }
             }
 
-            // Thực hiện phát âm
-            window.speechSynthesis.speak(utterance);
+            // 5. Thực hiện phát âm
+            setTimeout(() => {
+                synth.speak(utterance);
+            }, 50);
+        }
+
+        // Tải danh sách giọng đọc sẵn có của hệ thống
+        if (synth && synth.onvoiceschanged !== undefined) {
+            synth.onvoiceschanged = () => synth.getVoices();
         }
 
         function switchRole(role) {
