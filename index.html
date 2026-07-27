@@ -122,56 +122,55 @@
         </div>
     </div>
 
+    <!-- AUDIO PLAYER DỰ PHÒNG -->
+    <audio id="audioFallback" style="display:none;"></audio>
+
     <script>
         let questions = JSON.parse(localStorage.getItem('english_quiz')) || [];
         let currentIndex = 0;
 
-        // HÀM PHÁT ÂM CHỐNG KẸT/ĐÍCH THỰC DÙNG TRÊN ANDROID
         function speakText(text) {
-            if (!text || !('speechSynthesis' in window)) return;
+            if (!text) return;
+            const cleanText = text.trim();
 
-            const synth = window.speechSynthesis;
-
-            // 1. Khôi phục nếu trình duyệt đang ở trạng thái pause
-            if (synth.paused) {
-                synth.resume();
-            }
-
-            // 2. Dừng lượt đọc cũ
-            synth.cancel();
-
-            // 3. Khởi tạo Utterance
-            let utterance = new SpeechSynthesisUtterance(text.trim());
-            utterance.lang = 'en-US';
-            utterance.rate = 0.85; // Tốc độ đọc vừa phải
-            utterance.pitch = 1.0;
-
-            // 4. Tìm giọng đọc en-US nếu có
-            let voices = synth.getVoices();
-            if (voices.length > 0) {
-                let usVoice = voices.find(v => v.lang && v.lang.replace('_', '-').includes('en-US'));
-                if (usVoice) utterance.voice = usVoice;
-            }
-
-            // 5. Phát âm với cơ chế delay nhẹ 50ms chống xung đột sự kiện chạm
-            setTimeout(() => {
-                synth.speak(utterance);
-            }, 50);
-        }
-
-        // Tải danh sách giọng đọc của hệ thống ngay khi sẵn sàng
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.onvoiceschanged = () => {
-                window.speechSynthesis.getVoices();
-            };
-        }
-
-        // Kích hoạt audio context ngay khi bấm bất kỳ đâu trên màn hình
-        document.addEventListener('click', function unlockAudio() {
+            // PHƯƠNG ÁN 1: DÙNG SPEECH SYNTHESIS CỦA HỆ THỐNG
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.resume();
+                window.speechSynthesis.cancel();
+
+                let utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.85;
+
+                // Cờ kiểm tra xem hệ thống có thực sự đọc hay không
+                let hasSpoken = false;
+
+                utterance.onstart = function() {
+                    hasSpoken = true;
+                };
+
+                window.speechSynthesis.speak(utterance);
+
+                // Sau 300ms nếu hệ thống không bắt đầu đọc (bị im re do thiếu gói ngôn ngữ Android)
+                setTimeout(() => {
+                    if (!hasSpoken && !window.speechSynthesis.speaking) {
+                        speakFallback(cleanText);
+                    }
+                }, 300);
+            } else {
+                speakFallback(cleanText);
             }
-        }, { once: false });
+        }
+
+        // PHƯƠNG ÁN 2: PHÁT DỰ PHÒNG QUA NGUỒN AUDIO ĐÁNG TIN CẬY
+        function speakFallback(text) {
+            const audio = document.getElementById('audioFallback');
+            const encodedText = encodeURIComponent(text);
+            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=en&client=tw-ob`;
+            
+            audio.play().catch(e => {
+                console.log("Audio play error:", e);
+            });
+        }
 
         function switchRole(role) {
             if(role === 'teacher') {
@@ -265,7 +264,6 @@
                 speakText(correctAns);
             };
 
-            // Tự động phát âm đáp án ngay khi bấm xác nhận
             speakText(correctAns);
 
             document.getElementById('nextBtn').style.display = 'block';
